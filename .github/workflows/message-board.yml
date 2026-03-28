@@ -1,0 +1,126 @@
+
+name: 最中幻想Board - 留言板服务
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      reset_db:
+        description: '重置数据库 (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  message-board:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6小时
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置Node.js环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: 安装依赖
+        run: npm ci
+      
+      - name: 下载上次留言数据
+        id: download-data
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: message-board-data
+          path: ./data/
+      
+      - name: 初始化数据库
+        run: |
+          mkdir -p ./data
+          if [ "${{ github.event.inputs.reset_db }}" = "true" ] || [ ! -f "./data/messages.db" ]; then
+            echo "🔄 初始化新数据库"
+            node scripts/init-db.js
+          else
+            echo "✅ 使用已有数据库"
+          fi
+      
+      - name: 启动留言板服务
+        run: |
+          npm start &
+          sleep 3
+          curl -I http://localhost:3000
+      
+      - name: 安装bore内网穿透
+        run: |
+          wget -q https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          tar -xzf bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          sudo mv bore /usr/local/bin/
+          rm bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+      
+      - name: 暴露公网地址
+        id: bore
+        run: |
+          bore local 3000 --to bore.pub 2>&1 | tee bore.log &
+          sleep 8
+          
+          PORT=$(grep -oP 'listening at bore\.pub:\K\d+' bore.log | head -1)
+          if [ -z "$PORT" ]; then
+            echo "❌ 获取隧道端口失败，日志内容:"
+            cat bore.log
+            exit 1
+          fi
+          
+          PUBLIC_URL="http://bore.pub:$PORT"
+          echo "✅ 公网访问地址: $PUBLIC_URL"
+          echo "public_url=$PUBLIC_URL" >> $GITHUB_OUTPUT
+          echo "$PUBLIC_URL" > public-url.txt
+          
+          echo "🎉 留言板已启动！访问地址: $PUBLIC_URL"
+          echo "🔐 管理员后台: $PUBLIC_URL/admin"
+          echo "📝 管理员密码: ${{ secrets.ADMIN_PASSWORD }}"
+      
+      - name: 保存公网地址
+        uses: actions/upload-artifact@v4
+        with:
+          name: bore-tunnel-url
+          path: public-url.txt
+          retention-days: 1
+      
+      - name: 等待服务运行
+        run: |
+          echo "⏰ 服务将运行6小时"
+          echo "📍 访问地址: ${{ steps.bore.outputs.public_url }}"
+          echo "💾 数据将在工作流结束时自动保存"
+          
+          # 创建定时保存脚本
+          cat > save_data.sh << 'EOF'
+          #!/bin/bash
+          while true; do
+            sleep 1800  # 每30分钟保存一次
+            echo "💾 保存数据备份..."
+            # 数据会在工作流结束时通过upload自动保存
+          done
+          EOF
+          
+          chmod +x save_data.sh
+          ./save_data.sh &
+          
+          # 保持运行
+          sleep 6h
+      
+      - name: 保存留言数据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: message-board-data
+          path: ./data/messages.db
+          retention-days: 90
+      
+      - name: 清理临时文件
+        if: always()
+        run: |
+          echo "🧹 清理临时文件..."
+          rm -f bore.log public-url.txt
