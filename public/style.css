@@ -1,0 +1,521 @@
+{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-cyan: #00ffff;
+    --primary-magenta: #ff00ff;
+    --primary-blue: #0066ff;
+    --bg-dark: #0a0a0f;
+    --bg-darker: #050507;
+    --glass-bg: rgba(10, 10, 15, 0.7);
+    --glass-border: rgba(0, 255, 255, 0.2);
+    --text-primary: #e0e0ff;
+    --text-secondary: #8888aa;
+    --success: #00ff88;
+    --error: #ff3366;
+    --warning: #ffaa00;
+}
+
+body {
+    font-family: 'Segoe UI', 'Courier New', 'Monaco', monospace;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* 粒子画布 */
+#particleCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.container {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* 头部样式 */
+.header {
+    text-align: center;
+    padding: 40px 20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    margin-bottom: 30px;
+    animation: fadeInUp 0.8s ease;
+}
+
+.glitch-text {
+    font-size: 3rem;
+    font-weight: bold;
+    position: relative;
+    text-shadow: 
+        0.05em 0 0 var(--primary-magenta),
+        -0.05em -0.025em 0 var(--primary-cyan);
+    animation: glitch 0.3s infinite;
+}
+
+.glitch-text::before {
+    content: attr(data-text);
+    position: absolute;
+    left: -2px;
+    text-shadow: 2px 0 var(--primary-magenta);
+    top: 0;
+    color: var(--text-primary);
+    background: var(--bg-dark);
+    overflow: hidden;
+    clip: rect(0, 900px, 0, 0);
+    animation: noise-anim 2s infinite linear alternate-reverse;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    margin-top: 10px;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+}
+
+.header-stats {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--primary-cyan);
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+/* 表单样式 */
+.message-form-container,
+.admin-section,
+.messages-container {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    padding: 30px;
+    margin-bottom: 30px;
+    animation: fadeInUp 0.6s ease;
+}
+
+.form-title,
+.messages-title {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, var(--primary-cyan), var(--primary-magenta));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 12px 15px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-cyan);
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+.checkbox-custom {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--glass-border);
+    border-radius: 4px;
+    display: inline-block;
+    position: relative;
+}
+
+input[type="checkbox"] {
+    display: none;
+}
+
+input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--primary-cyan);
+    font-size: 12px;
+}
+
+.char-counter {
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+.submit-btn {
+    position: relative;
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--primary-blue), var(--primary-magenta));
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+}
+
+.btn-glow {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s ease;
+}
+
+.submit-btn:hover .btn-glow {
+    left: 100%;
+}
+
+/* 管理员区域 */
+.admin-section h3 {
+    margin-bottom: 15px;
+    color: var(--primary-cyan);
+}
+
+.admin-btn {
+    padding: 8px 20px;
+    background: linear-gradient(135deg, var(--primary-cyan), var(--primary-blue));
+    border: none;
+    border-radius: 8px;
+    color: var(--bg-dark);
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.admin-btn.small {
+    padding: 5px 15px;
+    font-size: 0.9rem;
+}
+
+.admin-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(0, 255, 255, 0.3);
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.admin-info p {
+    color: var(--success);
+    font-size: 0.9rem;
+}
+
+/* 留言卡片 */
+.messages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.message-card {
+    background: rgba(0, 0, 0, 0.4);
+    border-left: 3px solid var(--primary-cyan);
+    border-radius: 10px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    animation: fadeInUp 0.4s ease;
+}
+
+.message-card:hover {
+    transform: translateX(5px);
+    background: rgba(0, 0, 0, 0.6);
+    border-left-color: var(--primary-magenta);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.message-name {
+    font-weight: bold;
+    color: var(--primary-cyan);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.anonymous-icon {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.message-time {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.message-content {
+    margin-bottom: 15px;
+    line-height: 1.6;
+    word-wrap: break-word;
+}
+
+.message-reply {
+    margin-top: 15px;
+    padding: 12px;
+    background: rgba(0, 255, 255, 0.05);
+    border-radius: 8px;
+    border-left: 2px solid var(--primary-magenta);
+}
+
+.reply-label {
+    font-size: 0.85rem;
+    color: var(--primary-magenta);
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.reply-content {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.reply-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+}
+
+.message-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+}
+
+.reply-btn, .delete-btn {
+    padding: 5px 12px;
+    background: rgba(0, 255, 255, 0.1);
+    border: 1px solid var(--primary-cyan);
+    border-radius: 5px;
+    color: var(--primary-cyan);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.reply-btn:hover, .delete-btn:hover {
+    background: var(--primary-cyan);
+    color: var(--bg-dark);
+}
+
+.delete-btn {
+    border-color: var(--error);
+    color: var(--error);
+}
+
+.delete-btn:hover {
+    background: var(--error);
+    color: white;
+}
+
+.reply-form {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.reply-input {
+    width: 100%;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--glass-border);
+    border-radius: 5px;
+    color: var(--text-primary);
+    resize: vertical;
+}
+
+.reply-submit {
+    align-self: flex-end;
+    padding: 5px 15px;
+    background: var(--primary-cyan);
+    border: none;
+    border-radius: 5px;
+    color: var(--bg-dark);
+    cursor: pointer;
+    font-weight: bold;
+}
+
+/* 加载和错误状态 */
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+}
+
+.error-message {
+    text-align: center;
+    padding: 20px;
+    color: var(--error);
+    background: rgba(255, 51, 102, 0.1);
+    border-radius: 10px;
+}
+
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--primary-cyan);
+    border-radius: 10px;
+    color: var(--primary-cyan);
+    z-index: 1000;
+    animation: slideInRight 0.3s ease;
+}
+
+.toast.error {
+    border-color: var(--error);
+    color: var(--error);
+}
+
+.toast.success {
+    border-color: var(--success);
+    color: var(--success);
+}
+
+/* 动画 */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes glitch {
+    0% {
+        text-shadow: 0.05em 0 0 var(--primary-magenta), -0.05em -0.025em 0 var(--primary-cyan);
+    }
+    100% {
+        text-shadow: -0.05em 0 0 var(--primary-magenta), 0.05em 0.025em 0 var(--primary-cyan);
+    }
+}
+
+@keyframes noise-anim {
+    0% {
+        clip: rect(10px, 9999px, 70px, 0);
+    }
+    100% {
+        clip: rect(30px, 9999px, 90px, 0);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .glitch-text {
+        font-size: 1.8rem;
+    }
+    
+    .message-form-container,
+    .admin-section,
+    .messages-container {
+        padding: 20px;
+    }
+    
+    .header-stats {
+        gap: 20px;
+    }
+    
+    .stat-value {
+        font-size: 1.2rem;
+    }
+    
+    .message-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
