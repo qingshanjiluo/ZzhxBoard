@@ -11,7 +11,7 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 确保数据目录存在
+// ========== 目录准备 ==========
 const dataDir = path.join(__dirname, 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -23,38 +23,26 @@ app.use(helmet({
 }));
 app.use(compression());
 
-// 限流配置
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15分钟
+  windowMs: 15 * 60 * 1000,
   max: 100,
   message: '请求过于频繁，请稍后再试'
 });
 app.use('/api/', limiter);
 
-// 解析请求体
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session配置
 app.use(session({
   secret: process.env.SESSION_SECRET || 'default-secret-change-this',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // GitHub Actions 使用 HTTP
+    secure: false,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000
   }
 }));
-
-// ========== 静态文件服务（必须在路由之前）==========
-// 提供 public 目录下的静态文件（CSS, JS, 图片等）
-app.use(express.static(path.join(__dirname, 'public')));
-
-// 显式处理根路径，返回 index.html（防止目录列表）
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
 
 // 获取客户端IP
 app.use((req, res, next) => {
@@ -63,6 +51,14 @@ app.use((req, res, next) => {
                   req.connection.remoteAddress;
   next();
 });
+
+// ========== 根路由（必须放在静态文件之前，确保优先返回HTML）==========
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ========== 静态文件服务 ==========
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ========== API 路由 ==========
 
@@ -195,12 +191,17 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// 健康检查
+// 健康检查（供 GitHub Actions 和外部监控使用）
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// 启动服务器
+// 404 处理（可选，保留以确保未匹配路由返回 JSON）
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found' });
+});
+
+// ========== 启动服务器 ==========
 app.listen(PORT, () => {
   console.log(`🚀 最中幻想Board 已启动`);
   console.log(`📍 本地访问: http://localhost:${PORT}`);
