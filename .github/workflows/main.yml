@@ -1,0 +1,127 @@
+name: 网站逻辑快速检测
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_url:
+        description: '公网访问地址（例如：http://bore.pub:34879）'
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检查输入URL
+        run: |
+          echo "测试地址: ${{ github.event.inputs.public_url }}"
+          if [[ ! "${{ github.event.inputs.public_url }}" =~ ^https?:// ]]; then
+            echo "❌ URL必须以 http:// 或 https:// 开头"
+            exit 1
+          fi
+
+      - name: 测试根路径 (应返回HTML，非目录列表)
+        run: |
+          URL="${{ github.event.inputs.public_url }}/"
+          echo "测试根路径: $URL"
+          RESPONSE=$(curl -s -i "$URL")
+          HTTP_CODE=$(echo "$RESPONSE" | head -n 1 | awk '{print $2}')
+          CONTENT_TYPE=$(echo "$RESPONSE" | grep -i "content-type:" | awk '{print $2}' | tr -d '\r')
+          BODY=$(curl -s "$URL")
+
+          echo "HTTP状态码: $HTTP_CODE"
+          echo "Content-Type: $CONTENT_TYPE"
+
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "❌ 根路径状态码不是200"
+            exit 1
+          fi
+
+          if [[ "$CONTENT_TYPE" != "text/html"* ]]; then
+            echo "❌ Content-Type不是text/html，可能是目录列表或JSON"
+            exit 1
+          fi
+
+          if [[ "$BODY" != *"<html"* ]]; then
+            echo "❌ 响应体中未找到 <html> 标签，可能不是正常页面"
+            exit 1
+          fi
+
+          echo "✅ 根路径返回正确的HTML页面"
+
+      - name: 测试健康检查接口
+        run: |
+          URL="${{ github.event.inputs.public_url }}/health"
+          echo "测试健康检查: $URL"
+          RESPONSE=$(curl -s "$URL")
+          if [[ "$RESPONSE" != *'"status":"ok"'* ]]; then
+            echo "❌ 健康检查响应异常: $RESPONSE"
+            exit 1
+          fi
+          echo "✅ 健康检查正常"
+
+      - name: 测试静态资源 (CSS)
+        run: |
+          URL="${{ github.event.inputs.public_url }}/style.css"
+          echo "测试CSS: $URL"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "❌ CSS文件返回状态码 $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ CSS文件可访问"
+
+      - name: 测试静态资源 (JS)
+        run: |
+          URL="${{ github.event.inputs.public_url }}/script.js"
+          echo "测试JS: $URL"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "❌ JS文件返回状态码 $HTTP_CODE"
+            exit 1
+          fi
+          echo "✅ JS文件可访问"
+
+      - name: 测试获取留言API (GET)
+        run: |
+          URL="${{ github.event.inputs.public_url }}/api/messages"
+          echo "测试API: $URL"
+          RESPONSE=$(curl -s "$URL")
+          if [[ "$RESPONSE" != *'"success":true'* ]]; then
+            echo "❌ API响应异常: $RESPONSE"
+            exit 1
+          fi
+          echo "✅ 获取留言API正常"
+
+      - name: 测试提交留言API (POST)
+        run: |
+          URL="${{ github.event.inputs.public_url }}/api/messages"
+          echo "测试提交留言API: $URL"
+          RESPONSE=$(curl -s -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -d '{"content":"自动化测试留言","name":"测试者","isAnonymous":false}')
+          if [[ "$RESPONSE" != *'"success":true'* ]]; then
+            echo "❌ 提交留言失败: $RESPONSE"
+            exit 1
+          fi
+          echo "✅ 提交留言API正常"
+
+      - name: 测试管理员登录API
+        run: |
+          URL="${{ github.event.inputs.public_url }}/api/admin/login"
+          echo "测试管理员登录API: $URL"
+          # 假设管理员密码为 admin123（可自行修改）
+          RESPONSE=$(curl -s -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -d '{"password":"admin123"}')
+          if [[ "$RESPONSE" != *'"success":true'* ]]; then
+            echo "❌ 管理员登录失败: $RESPONSE"
+            exit 1
+          fi
+          echo "✅ 管理员登录API正常"
+
+      - name: 汇总结果
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "🎉 所有测试通过！网站逻辑运行正常"
+          echo "═══════════════════════════════════════════════════════════"
