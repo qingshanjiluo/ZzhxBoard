@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "init-db": "node scripts/init-db.js"
   },
-  "keywords": ["message-board", "express", "sqlite3", "cyberpunk"],
+  "keywords": ["message-board", "express", "sqlite3", "cyberpunk", "留言板"],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
