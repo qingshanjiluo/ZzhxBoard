@@ -17,7 +17,7 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// 安全中间件
+// ========== 安全与基础中间件 ==========
 app.use(helmet({
   contentSecurityPolicy: false, // 允许内联样式
 }));
@@ -26,7 +26,7 @@ app.use(compression());
 // 限流配置
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
-  max: 100, // 限制100次请求
+  max: 100,
   message: '请求过于频繁，请稍后再试'
 });
 app.use('/api/', limiter);
@@ -41,24 +41,30 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // GitHub Actions使用HTTP
+    secure: false, // GitHub Actions 使用 HTTP
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24小时
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
-// 静态文件服务
-app.use(express.static('public'));
+// ========== 静态文件服务（必须在路由之前）==========
+// 提供 public 目录下的静态文件（CSS, JS, 图片等）
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 显式处理根路径，返回 index.html（防止目录列表）
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // 获取客户端IP
 app.use((req, res, next) => {
-  req.clientIp = req.headers['x-forwarded-for'] || 
-                  req.socket.remoteAddress || 
+  req.clientIp = req.headers['x-forwarded-for'] ||
+                  req.socket.remoteAddress ||
                   req.connection.remoteAddress;
   next();
 });
 
-// ============= API路由 =============
+// ========== API 路由 ==========
 
 // 获取所有留言
 app.get('/api/messages', async (req, res) => {
@@ -76,26 +82,25 @@ app.post('/api/messages', async (req, res) => {
   try {
     const { content, name, isAnonymous } = req.body;
     const ip = req.clientIp;
-    
-    // 验证
+
     if (!content || content.trim().length < 1) {
       return res.status(400).json({ success: false, error: '留言内容不能为空' });
     }
     if (content.length > 500) {
       return res.status(400).json({ success: false, error: '留言内容不能超过500字' });
     }
-    
+
     const displayName = isAnonymous ? '匿名用户' : (name?.trim() || '匿名用户');
-    
+
     const messageId = await db.createMessage({
       content: content.trim(),
       name: displayName,
       ip: ip,
       isAnonymous: isAnonymous || false
     });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       data: { id: messageId },
       message: '留言发布成功！'
     });
@@ -110,7 +115,7 @@ app.post('/api/admin/login', async (req, res) => {
   try {
     const { password } = req.body;
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    
+
     if (password === adminPassword) {
       req.session.isAdmin = true;
       req.session.adminLoginTime = Date.now();
@@ -132,9 +137,9 @@ app.post('/api/admin/logout', (req, res) => {
 
 // 检查管理员状态
 app.get('/api/admin/check', (req, res) => {
-  res.json({ 
-    success: true, 
-    isAdmin: !!req.session.isAdmin 
+  res.json({
+    success: true,
+    isAdmin: !!req.session.isAdmin
   });
 });
 
@@ -144,17 +149,17 @@ app.post('/api/admin/reply/:id', async (req, res) => {
     if (!req.session.isAdmin) {
       return res.status(403).json({ success: false, error: '未授权' });
     }
-    
+
     const { id } = req.params;
     const { reply } = req.body;
-    
+
     if (!reply || reply.trim().length < 1) {
       return res.status(400).json({ success: false, error: '回复内容不能为空' });
     }
     if (reply.length > 500) {
       return res.status(400).json({ success: false, error: '回复内容不能超过500字' });
     }
-    
+
     await db.addReply(id, reply.trim());
     res.json({ success: true, message: '回复成功' });
   } catch (error) {
@@ -169,7 +174,7 @@ app.delete('/api/admin/message/:id', async (req, res) => {
     if (!req.session.isAdmin) {
       return res.status(403).json({ success: false, error: '未授权' });
     }
-    
+
     const { id } = req.params;
     await db.deleteMessage(id);
     res.json({ success: true, message: '删除成功' });
