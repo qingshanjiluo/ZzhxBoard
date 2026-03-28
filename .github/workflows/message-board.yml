@@ -23,16 +23,76 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
       
-      - name: 安装依赖
+      - name: 检查并创建必要文件
         run: |
-          # 如果没有package-lock.json，先创建
+          echo "📁 检查项目文件..."
+          
+          # 检查并创建 package.json（如果不存在）
+          if [ ! -f package.json ]; then
+            echo "📦 创建 package.json..."
+            cat > package.json << 'EOF'
+{
+  "name": "most-wish-board",
+  "version": "1.0.0",
+  "description": "最中幻想Board - 留言板系统",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "sqlite3": "^5.1.6",
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^6.10.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
+EOF
+          fi
+          
+          # 检查 server.js 是否存在
+          if [ ! -f server.js ]; then
+            echo "❌ 错误: server.js 不存在！"
+            exit 1
+          fi
+          
+          # 检查 public 目录
+          if [ ! -d public ]; then
+            echo "📁 创建 public 目录..."
+            mkdir -p public
+          fi
+          
+          echo "✅ 文件检查完成"
+      
+      - name: 生成 package-lock.json 并安装依赖
+        run: |
+          echo "📦 生成 package-lock.json..."
+          
+          # 如果没有 package-lock.json，先生成
           if [ ! -f package-lock.json ]; then
-            echo "📦 生成 package-lock.json..."
+            echo "⚠️ 未找到 package-lock.json，正在生成..."
             npm install --package-lock-only
           fi
-          npm ci || npm install
+          
+          # 安装依赖（如果失败则降级到 npm install）
+          echo "📥 安装依赖..."
+          if npm ci; then
+            echo "✅ 使用 npm ci 安装成功"
+          else
+            echo "⚠️ npm ci 失败，使用 npm install..."
+            npm install
+          fi
+          
+          echo "✅ 依赖安装完成"
       
       - name: 下载上次留言数据
         id: download-data
@@ -45,52 +105,94 @@ jobs:
       - name: 初始化数据库
         run: |
           mkdir -p ./data
-          if [ "${{ github.event.inputs.reset_db }}" = "true" ] || [ ! -f "./data/messages.db" ]; then
-            echo "🔄 初始化新数据库"
-            node scripts/init-db.js
+          
+          # 检查是否需要重置数据库
+          if [ "${{ github.event.inputs.reset_db }}" = "true" ]; then
+            echo "🔄 重置数据库..."
+            rm -f ./data/messages.db
+          fi
+          
+          # 如果数据库不存在，初始化
+          if [ ! -f "./data/messages.db" ]; then
+            echo "🔄 初始化新数据库..."
+            # 创建数据库初始化脚本
+            node -e "
+              const sqlite3 = require('sqlite3');
+              const db = new sqlite3.Database('./data/messages.db');
+              db.serialize(() => {
+                db.run(\`CREATE TABLE IF NOT EXISTS messages (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  content TEXT NOT NULL,
+                  name TEXT NOT NULL,
+                  ip TEXT,
+                  isAnonymous INTEGER DEFAULT 0,
+                  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  reply TEXT,
+                  replyAt DATETIME,
+                  status INTEGER DEFAULT 1
+                )\`);
+                console.log('✅ 数据库初始化完成');
+              });
+              db.close();
+            "
           else
             echo "✅ 使用已有数据库"
+            # 显示数据库信息
+            ls -lh ./data/messages.db
           fi
       
       - name: 启动留言板服务
         run: |
+          echo "🚀 启动服务..."
           npm start &
           sleep 5
-          # 等待服务启动
-          for i in {1..10}; do
-            if curl -s http://localhost:3000/health > /dev/null; then
+          
+          # 等待服务启动，最多等待30秒
+          for i in {1..15}; do
+            if curl -s http://localhost:3000/health > /dev/null 2>&1; then
               echo "✅ 服务启动成功"
               break
             fi
-            echo "⏳ 等待服务启动... ($i/10)"
+            echo "⏳ 等待服务启动... ($i/15)"
             sleep 2
           done
+          
+          # 最终检查
+          if curl -s http://localhost:3000/health > /dev/null 2>&1; then
+            echo "✅ 服务运行正常"
+          else
+            echo "⚠️ 服务可能未完全启动，继续运行..."
+          fi
       
       - name: 安装bore内网穿透
         run: |
+          echo "🔧 安装 bore..."
           wget -q https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
           tar -xzf bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
           sudo mv bore /usr/local/bin/
           rm bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          echo "✅ bore 安装完成"
       
       - name: 暴露公网地址
         id: bore
         run: |
+          echo "🌐 启动 bore 隧道..."
           bore local 3000 --to bore.pub 2>&1 | tee bore.log &
           sleep 10
           
+          # 尝试多种方式获取端口
           PORT=$(grep -oP 'listening at bore\.pub:\K\d+' bore.log | head -1)
           if [ -z "$PORT" ]; then
-            echo "⚠️ 未获取到端口，尝试备用方案..."
             PORT=$(grep -oP 'bore\.pub:\K\d+' bore.log | head -1)
           fi
           
           if [ -z "$PORT" ]; then
-            echo "❌ 获取隧道端口失败，日志内容:"
+            echo "⚠️ 未获取到端口，使用备用方案..."
+            PUBLIC_URL="http://bore.pub"
+            echo "public_url=$PUBLIC_URL" >> $GITHUB_OUTPUT
+            echo "$PUBLIC_URL" > public-url.txt
+            echo "❌ 未能获取完整隧道地址，请查看日志"
             cat bore.log
-            # 继续运行，不退出
-            echo "public_url=http://bore.pub:unknown" >> $GITHUB_OUTPUT
-            echo "unknown" > public-url.txt
           else
             PUBLIC_URL="http://bore.pub:$PORT"
             echo "✅ 公网访问地址: $PUBLIC_URL"
@@ -115,19 +217,37 @@ jobs:
           echo "🔐 管理员密码: ${{ secrets.ADMIN_PASSWORD }}"
           echo "💾 数据保存路径: ./data/messages.db"
           echo "═══════════════════════════════════════════════════════════"
-          echo "⏰ 服务将运行6小时"
-          echo "📊 查看留言: ${{ steps.bore.outputs.public_url }}"
+          echo "📝 测试留言: ${{ steps.bore.outputs.public_url }}"
           echo "🔧 健康检查: ${{ steps.bore.outputs.public_url }}/health"
           echo "═══════════════════════════════════════════════════════════"
+          echo "⏰ 服务将运行6小时"
+          echo "💡 提示: 下载 Artifacts 中的 bore-tunnel-url 获取完整地址"
       
-      - name: 保持运行
+      - name: 健康检查和保活
         run: |
-          # 创建一个简单的保活脚本
+          echo "🔄 启动健康检查..."
+          
+          # 创建健康检查脚本
+          cat > health_check.sh << 'SCRIPT'
+          #!/bin/bash
           while true; do
-            sleep 3600
-            echo "🕐 服务仍在运行 - $(date)"
-            curl -s http://localhost:3000/health > /dev/null && echo "✅ 健康检查通过" || echo "⚠️ 健康检查失败"
+            sleep 300  # 每5分钟检查一次
+            if curl -s -f http://localhost:3000/health > /dev/null 2>&1; then
+              echo "[$(date)] ✅ 健康检查通过"
+            else
+              echo "[$(date)] ⚠️ 健康检查失败，尝试重启服务..."
+              pkill -f "node server.js" || true
+              npm start &
+            fi
           done
+          SCRIPT
+          
+          chmod +x health_check.sh
+          ./health_check.sh &
+          
+          # 保持运行6小时
+          echo "⏰ 保持运行中..."
+          sleep 6h
       
       - name: 保存留言数据
         if: always()
@@ -141,4 +261,5 @@ jobs:
         if: always()
         run: |
           echo "🧹 清理临时文件..."
-          rm -f bore.log public-url.txt 2>/dev/null || true
+          rm -f bore.log public-url.txt health_check.sh 2>/dev/null || true
+          echo "✅ 清理完成"
