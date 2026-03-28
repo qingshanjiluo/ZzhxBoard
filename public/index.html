@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>最中幻想Board - 科技风留言板</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <!-- 粒子背景 -->
+    <canvas id="particleCanvas"></canvas>
+    
+    <div class="container">
+        <!-- 头部区域 -->
+        <header class="header">
+            <div class="logo">
+                <h1 class="glitch-text" data-text="最中幻想Board">最中幻想Board</h1>
+                <p class="subtitle">✦ 你的幻想，在此回响 ✦</p>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item">
+                    <span class="stat-label">留言总数</span>
+                    <span class="stat-value" id="totalMessages">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">已回复</span>
+                    <span class="stat-value" id="repliedCount">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 留言表单区域 -->
+        <div class="message-form-container">
+            <h2 class="form-title">✍️ 留下你的幻想</h2>
+            <form id="messageForm">
+                <div class="form-group">
+                    <input type="text" id="nameInput" placeholder="你的名字 (可选)" maxlength="50">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="anonymousCheckbox">
+                        <span class="checkbox-custom"></span>
+                        匿名留言
+                    </label>
+                </div>
+                <div class="form-group">
+                    <textarea 
+                        id="contentInput" 
+                        placeholder="写下你的幻想、想法或留言..." 
+                        maxlength="500"
+                        rows="4"
+                    ></textarea>
+                    <div class="char-counter">
+                        <span id="charCount">0</span> / 500
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <span class="btn-text">发布留言</span>
+                    <span class="btn-glow"></span>
+                </button>
+            </form>
+        </div>
+
+        <!-- 管理员登录区域 -->
+        <div class="admin-section" id="adminSection">
+            <div class="admin-login" id="adminLoginForm">
+                <h3>🔐 管理员入口</h3>
+                <div class="form-group">
+                    <input type="password" id="adminPassword" placeholder="管理员密码">
+                    <button id="adminLoginBtn" class="admin-btn">登录</button>
+                </div>
+            </div>
+            <div class="admin-panel" id="adminPanel" style="display: none;">
+                <div class="admin-header">
+                    <h3>👑 管理面板</h3>
+                    <button id="adminLogoutBtn" class="admin-btn small">登出</button>
+                </div>
+                <div class="admin-info">
+                    <p>✅ 已登录 - 您可以回复和删除留言</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 留言列表区域 -->
+        <div class="messages-container">
+            <h2 class="messages-title">💬 幻想回廊</h2>
+            <div id="messagesList" class="messages-list">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>
