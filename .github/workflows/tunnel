@@ -1,0 +1,58 @@
+name: Expose Service via bore (with URL Artifact)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  tunnel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start local service
+        run: |
+          python3 -m http.server 8000 &
+          sleep 2
+
+      - name: Install bore
+        run: |
+          wget -q https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          tar -xzf bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          sudo mv bore /usr/local/bin/
+          rm bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+
+      - name: Expose via bore
+        run: |
+          # 启动 bore，将输出重定向到文件
+          bore local 8000 --to bore.pub 2>&1 | tee bore.log &
+          BORE_PID=$!
+          sleep 5
+
+          # 从日志中提取端口（格式 "listening at bore.pub:XXXXX"）
+          PORT=$(grep -oP 'listening at bore\.pub:\K\d+' bore.log | head -1)
+          if [ -z "$PORT" ]; then
+            echo "❌ Failed to get tunnel port. bore.log content:"
+            cat bore.log
+            exit 1
+          fi
+
+          PUBLIC_URL="http://bore.pub:$PORT"
+          echo "✅ Public URL: $PUBLIC_URL"
+          echo "PUBLIC_URL=$PUBLIC_URL" >> $GITHUB_ENV
+          echo "$PUBLIC_URL" > public-url.txt
+
+      - name: Upload public URL as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bore-tunnel-url
+          path: public-url.txt
+          retention-days: 1
+
+      - name: Keep runner alive
+        run: |
+          echo "🔗 Service accessible at: ${{ env.PUBLIC_URL }}"
+          echo "⏱️ This runner will stay alive for up to 6 hours."
+          sleep 6h
